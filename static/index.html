@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scam SMS Shield</title>
+<style>
+  :root{
+    --paper:#e8edf4; --sheet:#fcfdff; --ink:#14213d; --ink2:#4b5a76; --rule:#c8d2e1;
+    --blue:#27489a; --blue-d:#1d3a80;
+    --scam:#b3261e; --warn:#9a5b00; --safe:#17714a;
+    --serif:Georgia,"Times New Roman",serif;
+    --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  [hidden]{display:none!important}
+  body{
+    min-height:100vh;color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.5;
+    background-color:var(--paper);
+    background-image:repeating-linear-gradient(0deg,transparent 0 31px,rgba(20,33,61,.045) 31px 32px);
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:26px 20px 56px}
+  :focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+
+  /* header */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:12px;font-family:var(--serif);font-weight:700;font-size:25px;letter-spacing:-.01em}
+  .brand svg{width:34px;height:34px;color:var(--blue)}
+  .meta{color:var(--ink2);font-size:14px;max-width:46ch}
+
+  /* tabs */
+  .tabs{display:flex;gap:26px;border-bottom:1.5px solid var(--rule);margin-bottom:28px}
+  .tab{background:none;border:0;padding:10px 2px;font:inherit;font-weight:600;color:var(--ink2);cursor:pointer;
+       border-bottom:3px solid transparent;margin-bottom:-1.5px}
+  .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blue)}
+
+  /* layout */
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:34px;align-items:start}
+  @media(max-width:860px){.two{grid-template-columns:1fr;gap:26px}}
+
+  /* composer */
+  label.q{display:block;font-weight:600;margin-bottom:8px}
+  textarea{
+    width:100%;min-height:176px;resize:vertical;padding:16px 18px;font:inherit;font-size:16px;color:var(--ink);
+    background:#fff;border:1.5px solid var(--rule);border-radius:20px 20px 20px 4px;
+  }
+  textarea::placeholder{color:#8795ad}
+  .actions{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:12px 22px;cursor:pointer;
+       background:var(--blue);color:#fff;transition:background .15s}
+  .btn:hover{background:var(--blue-d)}
+  .btn:disabled{opacity:.55;cursor:progress}
+  .btn.quiet{background:transparent;color:var(--ink2);box-shadow:inset 0 0 0 1.5px var(--rule)}
+  .btn.quiet:hover{background:rgba(20,33,61,.06)}
+  .count{margin-left:auto;font-size:13px;color:var(--ink2)}
+  .err{margin-top:14px;padding:11px 14px;border-left:4px solid var(--scam);background:#fdeceb;color:#6e1712;font-size:14.5px;border-radius:0 8px 8px 0}
+
+  .samples{margin-top:26px}
+  .samples p{font-weight:600;margin-bottom:10px}
+  .samples ul{list-style:none;padding:0;display:grid;gap:8px}
+  .sample{width:100%;text-align:left;font:inherit;font-size:14px;color:var(--ink2);background:var(--sheet);
+          border:1.5px solid var(--rule);border-radius:10px;padding:10px 14px;cursor:pointer}
+  .sample:hover{border-color:var(--blue);color:var(--ink)}
+
+  /* verdict sheet */
+  .sheet{background:var(--sheet);border:1.5px solid var(--rule);border-radius:6px;padding:26px;
+         box-shadow:0 1px 0 #fff inset,0 14px 30px -22px rgba(20,33,61,.45)}
+  .empty{display:flex;gap:22px;align-items:center;color:var(--ink2);min-height:210px}
+  .empty svg{flex:none;width:112px;height:112px;color:var(--rule)}
+  .empty p{max-width:34ch}
+  .head{display:flex;gap:24px;align-items:center;flex-wrap:wrap}
+  .stamp{width:176px;height:176px;flex:none;color:var(--tone);transform:rotate(-8deg);opacity:.93}
+  .stamp.thunk{animation:thunk .36s cubic-bezier(.2,.9,.3,1.2)}
+  @keyframes thunk{from{transform:rotate(-20deg) scale(1.55);opacity:0}to{transform:rotate(-8deg) scale(1);opacity:.93}}
+  @media(prefers-reduced-motion:reduce){.stamp.thunk{animation:none}}
+  .say{flex:1;min-width:210px}
+  .say h2{font-family:var(--serif);font-size:30px;line-height:1.15;color:var(--tone);margin-bottom:8px}
+  .say p{color:var(--ink2);font-size:15.5px}
+  h3{font-size:15px;margin:26px 0 10px}
+  .msgview{background:#fff;border:1.5px solid var(--rule);border-radius:16px 16px 16px 4px;padding:14px 16px;
+           overflow-wrap:anywhere;font-size:16px;line-height:1.75}
+  .mark{background:rgba(var(--tone-rgb),calc(var(--i) * .3));box-shadow:inset 0 -2px 0 rgba(var(--tone-rgb),.85);
+        border-radius:3px;padding:0 2px}
+  .signals{list-style:none;padding:0;display:grid;gap:10px}
+  .signals li{border-left:4px solid var(--tone);padding:2px 0 2px 12px}
+  .signals strong{display:block;font-size:15px}
+  .signals span{color:var(--ink2);font-size:14.5px}
+  .none{color:var(--ink2);font-size:14.5px}
+  .tone-scam{--tone:var(--scam);--tone-rgb:179,38,30}
+  .tone-warn{--tone:var(--warn);--tone-rgb:154,91,0}
+  .tone-safe{--tone:var(--safe);--tone-rgb:23,113,74}
+
+  /* bulk */
+  .drop{display:block;border:2px dashed var(--rule);border-radius:14px;background:rgba(252,253,255,.7);padding:30px 22px;
+        text-align:center;cursor:pointer;color:var(--ink2)}
+  .drop:hover,.drop.over{border-color:var(--blue);background:#fff}
+  .drop strong{display:block;color:var(--ink);font-size:17px;margin-bottom:4px}
+  .drop input{position:absolute;opacity:0;width:1px;height:1px}
+  .drop:focus-within{outline:3px solid var(--blue);outline-offset:2px}
+  .bulkbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0 4px}
+  .bulkbar small{color:var(--ink2)}
+  #bulk-out{margin-top:26px}
+  .summary{font-family:var(--serif);font-size:22px;margin-bottom:12px}
+  .stack{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--rule);margin-bottom:18px}
+  .stack i{display:block;height:100%}
+  .tablewrap{overflow-x:auto;background:var(--sheet);border:1.5px solid var(--rule);border-radius:8px}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  th{text-align:left;font-weight:600;color:var(--ink2);padding:11px 14px;border-bottom:1.5px solid var(--rule);white-space:nowrap}
+  td{padding:11px 14px;border-bottom:1px solid var(--rule);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td.m{min-width:240px;overflow-wrap:anywhere}
+  td.r{white-space:nowrap;font-variant-numeric:tabular-nums}
+  .pill{display:inline-block;border:1.5px solid var(--tone);color:var(--tone);border-radius:99px;padding:1px 11px;font-weight:600;font-size:14px}
+  .dl{margin-top:14px}
+
+  footer{margin-top:40px;color:var(--ink2);font-size:13.5px}
+  /* Modern, responsive presentation */
+  :root{
+    --paper:#f3f6fc;--sheet:#fff;--ink:#17243d;--ink2:#66738b;--rule:#e1e7f0;
+    --blue:#425cf0;--blue-d:#3049d4;--scam:#ca4549;--warn:#a96508;--safe:#087e68;
+    --serif:ui-serif,Georgia,serif;--sans:Inter,"Segoe UI",system-ui,-apple-system,sans-serif;
+  }
+  body{
+    background:
+      radial-gradient(ellipse at 4% 0%,rgba(87,112,255,.09),transparent 34rem),
+      radial-gradient(ellipse at 96% 9%,rgba(30,178,153,.08),transparent 29rem),
+      var(--paper);
+  }
+  .wrap{max-width:1180px;padding:34px 24px 52px}
+  .top{align-items:center;margin-bottom:28px}
+  .brand{font:750 22px/1.1 var(--sans);letter-spacing:-.04em;gap:10px}
+  .brand svg{color:var(--blue);width:38px;height:38px}
+  .meta{
+    border:1px solid var(--rule);background:rgba(255,255,255,.85);border-radius:13px;
+    padding:10px 14px;font-size:13px;max-width:42ch;box-shadow:0 4px 14px rgba(28,43,75,.04)
+  }
+  .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin:12px 0 24px}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.13em;color:var(--blue);margin-bottom:7px}
+  .hero h1{font:750 clamp(28px,4vw,38px)/1.1 var(--sans);letter-spacing:-.045em;margin-bottom:8px}
+  .lead{color:var(--ink2);max-width:60ch;font-size:15px}
+  .privacy{flex:none;padding:10px 13px;border:1px solid #dcebe8;background:#f2fbf8;border-radius:12px;color:#286c5f;font-size:13px}
+  .tabs{width:max-content;max-width:100%;gap:4px;border:0;background:#e9edf6;border-radius:13px;padding:4px;margin-bottom:20px}
+  .tab{border:0;border-radius:10px;margin:0;padding:9px 15px;font-size:14px;transition:.15s ease}
+  .tab[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(25,39,70,.1)}
+  .two{grid-template-columns:minmax(0,.93fr) minmax(0,1.07fr);gap:22px}
+  #tab-one .two>div:first-child,.sheet{
+    border:1px solid var(--rule);border-radius:19px;background:rgba(255,255,255,.94);
+    box-shadow:0 12px 34px rgba(28,43,75,.055)
+  }
+  #tab-one .two>div:first-child{padding:22px}
+  label.q{font-size:15px;margin-bottom:9px}
+  textarea{
+    min-height:190px;padding:15px 16px;border:1px solid #d7deeb;border-radius:13px;
+    background:#fbfcff;font-size:15px;line-height:1.6;transition:border-color .15s,box-shadow .15s
+  }
+  textarea:focus{border-color:#7487ff;box-shadow:0 0 0 4px rgba(66,92,240,.1)}
+  .actions{gap:9px;margin-top:12px}
+  .btn{border-radius:10px;padding:10px 16px;font-size:14px}
+  .btn.quiet{background:#fff}
+  .btn.quiet:hover{background:#f6f8fc}
+  .count{font-size:12px}
+  .samples{margin-top:22px}
+  .samples p{font-size:13px;margin-bottom:9px}
+  .samples ul{gap:7px}
+  .sample{font-size:12.5px;padding:9px 11px;border-radius:10px;background:#fff;line-height:1.5}
+  .sheet{padding:22px;min-height:360px}
+  .empty{min-height:300px;justify-content:center;flex-direction:column;text-align:center;gap:13px}
+  .empty svg{width:72px;height:72px;color:#b8c5da}
+  .empty p{max-width:35ch;font-size:14px}
+  .stamp{display:none}
+  .head{gap:14px;flex-wrap:nowrap;align-items:flex-start}
+  .head:before{
+    content:var(--symbol);display:grid;place-items:center;flex:none;width:42px;height:42px;
+    border-radius:13px;background:color-mix(in srgb,var(--tone) 11%,white);color:var(--tone);
+    font:800 24px/1 var(--sans)
+  }
+  .tone-scam{--tone:var(--scam);--tone-rgb:202,69,73;--symbol:"!"}
+  .tone-warn{--tone:var(--warn);--tone-rgb:169,101,8;--symbol:"?"}
+  .tone-safe{--tone:var(--safe);--tone-rgb:8,126,104;--symbol:"✓"}
+  .say{min-width:0}
+  .say h2{font:750 22px/1.2 var(--sans);letter-spacing:-.025em;margin:1px 0 5px}
+  .say p{font-size:13.5px;line-height:1.55}
+  h3{font-size:13px;letter-spacing:.01em;margin:21px 0 9px}
+  .estimate{margin-top:18px;padding:13px 14px;border:1px solid var(--rule);border-radius:12px;background:#fafbfe}
+  .estimate-head{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px}
+  .estimate-head strong{font-size:12px;color:var(--ink2)}
+  .estimate-head span{font-size:14px;font-weight:750;font-variant-numeric:tabular-nums}
+  .track{height:6px;background:#e7ebf4;border-radius:99px;overflow:hidden;margin-top:8px}
+  .track i{display:block;height:100%;width:0;background:var(--tone);border-radius:99px;transition:width .35s ease}
+  .estimate-note{font-size:12px;color:var(--ink2);margin-top:8px}
+  .adjusted-note{margin-top:10px;padding:10px 12px;border-radius:10px;background:#fff7e8;color:#75501a;font-size:12.5px}
+  .msgview{background:#f8faff;border:1px solid var(--rule);border-radius:12px;font-size:14px;line-height:1.8;padding:13px 14px}
+  .signals{gap:8px}
+  .signals li{border-left-width:3px;padding:3px 0 3px 10px}
+  .signals strong{font-size:13px}
+  .signals span,.none{font-size:12.5px;line-height:1.55}
+  .copy-row{display:flex;align-items:center;gap:10px;margin-top:18px}
+  .copy-status{font-size:12px;color:var(--ink2)}
+  .drop{background:rgba(255,255,255,.8);border:1.5px dashed #bac6d9;border-radius:16px;padding:34px 22px}
+  .bulkbar{margin:14px 0 4px}
+  .summary{font:700 20px/1.3 var(--sans);letter-spacing:-.025em}
+  .stack{height:9px;border-radius:99px}
+  .tablewrap{border:1px solid var(--rule);border-radius:13px}
+  table{font-size:13px}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.07em;padding:11px 13px}
+  td{padding:11px 13px}
+  .pill{font-size:12px;padding:2px 9px;border-width:1px}
+  footer{margin-top:26px;padding-top:16px;border-top:1px solid var(--rule);font-size:12px}
+  @media(max-width:860px){
+    .two{grid-template-columns:1fr}
+    .hero{align-items:flex-start;flex-direction:column}
+    .privacy{flex:none}
+  }
+  @media(max-width:520px){
+    .wrap{padding:22px 14px 36px}
+    .top{align-items:flex-start}
+    .meta{width:100%;max-width:none}
+    #tab-one .two>div:first-child,.sheet{padding:17px}
+    .tabs{width:100%}
+    .tab{flex:1;padding:9px 7px;font-size:12.5px}
+    .head:before{width:36px;height:36px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+        <path d="M16 3 5 7v8c0 7 4.6 11.4 11 14 6.4-2.6 11-7 11-14V7L16 3Z"/><path d="m11 16 3.6 3.6L21.5 12"/>
+      </svg>
+      Scam SMS Shield
+    </div>
+    <p class="meta" id="meta">Reading model details…</p>
+  </header>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div>
+      <p class="eyebrow">SMS SAFETY CHECK</p>
+      <h1 id="hero-title">Pause. Check. Stay safer.</h1>
+      <p class="lead">Get a second opinion on a message, see what raised concern, and choose a safer next step.</p>
+    </div>
+    <p class="privacy">🔒 Your message is checked by this app and isn’t saved.</p>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="one" aria-selected="true">Check a message</button>
+    <button class="tab" role="tab" data-tab="many" aria-selected="false">Check many messages</button>
+  </div>
+
+  <!-- ONE MESSAGE -->
+  <section id="tab-one">
+    <div class="two">
+      <div>
+        <label class="q" for="msg">Paste the SMS you received</label>
+        <textarea id="msg" maxlength="1000" placeholder="For example: Dear customer, your KYC has expired. Update now at …"></textarea>
+        <div class="actions">
+          <button class="btn" id="go">Check message</button>
+          <button class="btn quiet" id="clear">Clear</button>
+          <span class="count" id="count">0 / 1000</span>
+        </div>
+        <div class="err" id="err" role="alert" hidden></div>
+        <div class="samples">
+          <p>Try a sample message</p>
+          <ul id="samples"></ul>
+        </div>
+      </div>
+
+      <div class="sheet" id="verdict" aria-live="polite">
+        <div class="empty">
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="6 7" aria-hidden="true">
+            <circle cx="60" cy="60" r="54"/><circle cx="60" cy="60" r="38"/>
+          </svg>
+          <p>Your result will include the RNN estimate, warning patterns and a safer next step.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MANY MESSAGES -->
+  <section id="tab-many" hidden>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".txt,.csv,.tsv,text/plain,text/csv">
+      <strong>Drop a file here, or click to choose one</strong>
+      A .txt file with one message per line, or a .csv with a column named text (up to 500 messages).
+    </label>
+    <div class="bulkbar">
+      <button class="btn quiet" id="sample-batch">Try a sample batch</button>
+      <small id="bulk-status"></small>
+    </div>
+    <div class="err" id="bulk-err" role="alert" hidden></div>
+    <div id="bulk-out" hidden>
+      <p class="summary" id="summary"></p>
+      <div class="stack" id="stack" aria-hidden="true"></div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Message</th><th>Verdict</th><th>RNN estimate</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <button class="btn dl" id="download">Download results as CSV</button>
+    </div>
+  </section>
+
+<footer>A BiLSTM (a type of RNN) estimates scam risk. A separate pattern check can raise an alert, but neither check can prove a message is safe. Never share an OTP or PIN.</footer>
+</div>
+
+<script>
+(function(){
+  const $ = (s, r = document) => r.querySelector(s);
+
+  const TONES = {
+    scam:       {title:"High risk: likely scam", word:"SCAM",   cls:"tone-scam", advice:"Don't click the link or reply. Never share an OTP, PIN or card details. Verify through an official channel."},
+    suspicious: {title:"Needs a closer look",   word:"REVIEW", cls:"tone-warn", advice:"Pause before acting. Confirm with the sender through the official app, website or a number you already trust."},
+    safe:       {title:"No strong warning signs",word:"CHECKED",cls:"tone-safe", advice:"No common warning patterns were found. This does not guarantee the message is safe; never share your OTP or PIN."}
+  };
+  const SAMPLES = [
+    "Dear SBI customer, your KYC has expired and your account will be blocked today. Update now: http://sbi-kyc-update.xyz/login",
+    "Congratulations! You have won Rs 50,000 cashback on UPI. Claim now: bit.ly/3xKyC9 before it expires.",
+    "Hi Mum, I lost my phone. Please send money to this new number - 8569874562 so I can pay my bills.",
+    "482913 is your OTP for login to Zomato. Do not share this with anyone. Valid for 10 minutes.",
+    "Hey, are you coming to the DS lab tomorrow? Don't forget the record book."
+  ];
+  const BATCH = [
+    ...SAMPLES,
+    "India Post: Your parcel is on hold due to incomplete address. Update details within 12 hours: http://indiapost-track.online/addr",
+    "Rs 499 debited from A/c XX4821 on 05-Oct towards UPI transfer. Avl bal Rs 12,340.50. -HDFC Bank",
+    "Part time job offer! Earn Rs 5,000 daily working from home. Message 9876501234 on WhatsApp now.",
+    "Reminder: Data Science lab record submission is due on Friday. Please bring the printed copy.",
+    "Dear customer, your debit card is blocked. Share the OTP received to unblock your card immediately.",
+    "Kal college ja raha hai kya? Notes chahiye the."
+  ];
+
+  /* ---------- header stats ---------- */
+  fetch("/api/stats").then(r => r.ok ? r.json() : Promise.reject()).then(m => {
+    $("#meta").textContent = "RNN benchmark: " + m.accuracy + "% accuracy · " + m.recall + "% scam recall · " + m.test_size + " test messages.";
+  }).catch(() => { $("#meta").textContent = "Model details are not available yet."; });
+
+  /* ---------- tabs ---------- */
+  document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", String(t === tab)));
+    $("#tab-one").hidden = tab.dataset.tab !== "one";
+    $("#tab-many").hidden = tab.dataset.tab !== "many";
+  }));
+
+  /* ---------- single message ---------- */
+  const msg = $("#msg"), go = $("#go");
+  const samplesEl = $("#samples");
+  SAMPLES.forEach(s => {
+    const li = document.createElement("li"), b = document.createElement("button");
+    b.className = "sample"; b.type = "button"; b.textContent = s;
+    b.addEventListener("click", () => { msg.value = s; updateCount(); check(); });
+    li.appendChild(b); samplesEl.appendChild(li);
+  });
+  function updateCount(){ $("#count").textContent = `${msg.value.length} / 1000`; }
+  msg.addEventListener("input", updateCount);
+  msg.addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") check(); });
+  $("#clear").addEventListener("click", () => { msg.value = ""; updateCount(); showErr(""); resetVerdict(); msg.focus(); });
+  go.addEventListener("click", check);
+
+  function showErr(text, id = "err"){ const el = $("#" + id); el.textContent = text; el.hidden = !text; }
+  function netMsg(e){
+    return (e instanceof TypeError) ? "Can't reach the checker. Make sure python app.py is still running in your terminal." : e.message;
+  }
+  function resetVerdict(){
+    $("#verdict").className = "sheet";
+    $("#verdict").innerHTML = '<div class="empty"><svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="6 7" aria-hidden="true"><circle cx="60" cy="60" r="54"/><circle cx="60" cy="60" r="38"/></svg><p>Your result will include the RNN estimate, warning patterns and a safer next step.</p></div>';
+  }
+
+  async function check(){
+    const text = msg.value.trim();
+    if (!text){ showErr("Paste a message first, or pick one of the samples."); return; }
+    showErr(""); go.disabled = true; go.textContent = "Checking…";
+    try {
+      const r = await fetch("/api/check", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text})});
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "The check failed. Try again.");
+      render(d);
+    } catch (e) { showErr(netMsg(e)); }
+    finally { go.disabled = false; go.textContent = "Check message"; }
+  }
+
+  function stampSVG(t, score){
+    const fs = t.word.length > 6 ? 24 : 38;
+    return `<svg class="stamp thunk" viewBox="0 0 220 220" role="img" aria-label="${t.title}. Scam risk ${score} percent">
+      <defs>
+        <path id="ring" d="M110,110 m-82,0 a82,82 0 1,1 164,0 a82,82 0 1,1 -164,0"/>
+        <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="4" result="n"/>
+          <feDisplacementMap in="SourceGraphic" in2="n" scale="2.4"/></filter>
+      </defs>
+      <g filter="url(#rough)">
+        <circle cx="110" cy="110" r="104" fill="none" stroke="currentColor" stroke-width="5"/>
+        <circle cx="110" cy="110" r="96" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="110" cy="110" r="64" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        <text font-size="11.5" letter-spacing="2" fill="currentColor" font-family="Segoe UI,Arial,sans-serif" font-weight="700"><textPath href="#ring">CHECKED BY SCAM SMS SHIELD • BILSTM MODEL • SMS CHECK •</textPath></text>
+        <text x="110" y="${fs > 30 ? 118 : 114}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="currentColor" font-family="Georgia,serif">${t.word}</text>
+        <text x="110" y="${fs > 30 ? 144 : 140}" text-anchor="middle" font-size="15" font-weight="600" fill="currentColor" font-family="Segoe UI,Arial,sans-serif">risk ${score}%</text>
+      </g></svg>`;
+  }
+
+  function render(d){
+    const t = TONES[d.verdict] || TONES.safe;
+    const box = $("#verdict");
+    box.className = "sheet " + t.cls;
+    box.innerHTML = '<div class="head">' + stampSVG(t, d.score) + '<div class="say"><h2></h2><p></p></div></div>' +
+      '<div class="estimate"><div class="estimate-head"><strong>RNN scam estimate</strong><span id="model-score"></span></div>' +
+      '<div class="track" aria-hidden="true"><i id="meter"></i></div><p class="estimate-note" id="estimate-note"></p></div>' +
+      '<p class="adjusted-note" id="adjusted-note" hidden></p>' +
+      '<h3>Words the model noticed</h3><p class="msgview" id="msgview"></p>' +
+      '<h3>Signals to review</h3><ul class="signals" id="sigs"></ul>' +
+      '<div class="copy-row"><button class="btn quiet" id="copy-summary" type="button">Copy safety summary</button><span class="copy-status" id="copy-status" role="status"></span></div>';
+    $(".say h2", box).textContent = t.title;
+    $(".say p", box).textContent = t.advice;
+    const modelScore = Number.isFinite(d.model_score) ? d.model_score : d.score;
+    $("#model-score", box).textContent = modelScore + "%";
+    $("#meter", box).style.width = Math.max(0, Math.min(100, modelScore)) + "%";
+    $("#estimate-note", box).textContent = "The model's estimate on its own; the warning pattern check is shown below.";
+    if (d.adjusted){
+      $("#adjusted-note", box).hidden = false;
+      $("#adjusted-note", box).textContent = "The pattern check raised this alert above the RNN-only result. Treat the message cautiously; this check is not proof.";
+    }
+
+    const mv = $("#msgview", box);
+    d.tokens.forEach((tok, i) => {
+      if (i) mv.appendChild(document.createTextNode(" "));
+      if (tok.i >= 0.15){
+        const s = document.createElement("span"); s.className = "mark"; s.style.setProperty("--i", tok.i); s.textContent = tok.w; mv.appendChild(s);
+      } else mv.appendChild(document.createTextNode(tok.w));
+    });
+    if (!d.tokens.some(x => x.i >= 0.15)){
+      const n = document.createElement("span"); n.className = "none"; n.textContent = d.verdict === "safe" ? "  No individual word stood out to the model." : "  No individual word stood out; look at the warning patterns below.";
+      mv.appendChild(n);
+    }
+
+    const ul = $("#sigs", box);
+    if (!d.signals.length){
+      const li = document.createElement("li"); li.className = "none"; li.style.borderLeftColor = "var(--rule)"; li.textContent = "No common scam signs found in this message."; ul.appendChild(li);
+    }
+    d.signals.forEach(s => {
+      const li = document.createElement("li"), a = document.createElement("strong"), b = document.createElement("span");
+      a.textContent = s.label; b.textContent = s.why; li.append(a, b); ul.appendChild(li);
+    });
+    $("#copy-summary", box).addEventListener("click", async () => {
+      const labels = d.signals.map(s => s.label);
+      const summary = ["Scam SMS Shield check: " + t.title, "RNN scam estimate: " + modelScore + "%",
+        "Signals: " + (labels.length ? labels.join("; ") : "No common warning patterns found"),
+        "Next step: " + t.advice].join("\n");
+      try {
+        await navigator.clipboard.writeText(summary);
+        $("#copy-status", box).textContent = "Summary copied";
+      } catch (_) {
+        $("#copy-status", box).textContent = "Copy isn’t available in this browser";
+      }
+    });
+  }
+
+  /* ---------- many messages ---------- */
+  let lastResults = [];
+  const drop = $("#drop"), file = $("#file");
+  file.addEventListener("change", () => file.files[0] && bulkFile(file.files[0]));
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => { const f = e.dataTransfer.files[0]; if (f) bulkFile(f); });
+  $("#sample-batch").addEventListener("click", () => bulkSend({method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({messages:BATCH})}));
+
+  function bulkFile(f){
+    const fd = new FormData(); fd.append("file", f);
+    bulkSend({method:"POST", body:fd}, f.name);
+  }
+  async function bulkSend(opts, name){
+    showErr("", "bulk-err"); $("#bulk-status").textContent = "Checking…";
+    try {
+      const r = await fetch("/api/bulk", opts);
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "The check failed. Try again.");
+      renderBulk(d); $("#bulk-status").textContent = name ? `Checked ${name}` : "Checked the sample batch";
+    } catch (e) { $("#bulk-status").textContent = ""; showErr(netMsg(e), "bulk-err"); }
+    finally { file.value = ""; }
+  }
+  function renderBulk(d){
+    const rank = {scam: 0, suspicious: 1, safe: 2};
+    lastResults = d.results.slice().sort((a, b) => rank[a.verdict] - rank[b.verdict] || b.score - a.score);
+    const s = d.summary;
+    $("#summary").textContent = s.total + " messages checked: " + s.scam + " high risk, " + s.suspicious + " needs review, " + s.safe + " no strong warning signs.";
+    const adjustedCount = d.results.filter(r => r.adjusted).length;
+    if (adjustedCount) $("#summary").textContent += " Safety patterns raised " + adjustedCount + " result" + (adjustedCount === 1 ? "" : "s") + ".";
+    const stack = $("#stack"); stack.innerHTML = "";
+    [["scam","var(--scam)"],["suspicious","var(--warn)"],["safe","var(--safe)"]].forEach(([k, c]) => {
+      if (!s[k]) return; const i = document.createElement("i"); i.style.width = (100 * s[k] / s.total) + "%"; i.style.background = c; stack.appendChild(i);
+    });
+    const body = $("#rows"); body.innerHTML = "";
+    lastResults.forEach(r => {
+      const t = TONES[r.verdict], tr = document.createElement("tr");
+      const a = document.createElement("td"), b = document.createElement("td"), c = document.createElement("td");
+      a.className = "m"; a.textContent = r.text; a.title = r.text;
+      const pill = document.createElement("span"); pill.className = "pill " + t.cls; pill.textContent = r.verdict === "scam" ? "High risk" : r.verdict === "suspicious" ? "Review" : "No strong signs";
+      b.appendChild(pill); c.className = "r"; c.textContent = r.score + "%";
+      tr.append(a, b, c); body.appendChild(tr);
+    });
+    $("#bulk-out").hidden = false;
+  }
+  $("#download").addEventListener("click", () => {
+    const q = v => '"' + String(v).replace(/"/g, '""') + '"';
+    const csv = "message,verdict,rnn_estimate_percent,safety_adjusted\n" + lastResults.map(r => [q(r.text), r.verdict, r.score, r.adjusted ? "yes" : "no"].join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], {type:"text/csv"})); a.download = "scam-check-results.csv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+})();
+</script>
+</body>
+</html>

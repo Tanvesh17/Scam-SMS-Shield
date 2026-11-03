@@ -1,0 +1,9 @@
+{
+  "accuracy": 97.9,
+  "precision": 89.6,
+  "recall": 93.8,
+  "f1": 91.6,
+  "test_size": 516,
+  "train_size": 4464,
+  "india_extra": 339
+}
